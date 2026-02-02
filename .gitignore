@@ -31,4 +31,7 @@
 *.out
 *.app
 
+# Build directories
+**/build
+
 \.DS_Store
