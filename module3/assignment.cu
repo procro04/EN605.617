@@ -112,7 +112,7 @@ int main(int argc, char** argv)
 	cudaMemcpy(gpu_v2, v2, array_size_in_bytes, cudaMemcpyHostToDevice);
 
 	// Kernel
-	vector_calc<<<numBlocks, totalThreads>>>(gpu_v1, gpu_v2, gpu_v3, N);
+	vector_calc<<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N);
 
 	cudaDeviceSynchronize();
 
