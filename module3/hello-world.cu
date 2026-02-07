@@ -4,8 +4,9 @@
 
 #include <stdio.h>
 
-#define N 16
-#define BLOCK_SIZE 16
+// #define N 16
+#define N 50000
+#define BLOCK_SIZE 32
 #define NUM_BLOCKS N/BLOCK_SIZE
 
 #define ARRAY_SIZE N
@@ -23,7 +24,6 @@ void hello(int * block)
 
 void main_sub()
 {
-
 	/* Declare pointers for GPU based params */
 	int *gpu_block;
 

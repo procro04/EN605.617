@@ -1,27 +1,45 @@
 //Based on the work of Andrew Krepps
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define N 100000
+
+void init_vectors(int* v1, int* v2, int min, int max)
+{
+    for (int i = 0; i < N; i++) {
+        v1[i] = min + rand() % (max - min + 1);
+        v2[i] = min + rand() % (max - min + 1);
+    }
+}
+
+void vector_add(int* v1, int* v2)
+{	
+	int v3[N];
+	for (int i = 0; i < N; ++i)
+	{
+		v3[i] = v1[i] + v2[i];
+	}
+}
 
 int main(int argc, char** argv)
 {
-	// read command line arguments
-	int totalThreads = (1 << 20);
-	int blockSize = 256;
-	
-	if (argc >= 2) {
-		totalThreads = atoi(argv[1]);
-	}
-	if (argc >= 3) {
-		blockSize = atoi(argv[2]);
-	}
+	int min = -1000;
+	int max = 1000;
+	// Seed the random number gen for populating the vectors
+	srand(time(NULL));
+	// Init vectors
+	int v1[N];
+	int v2[N];
+	init_vectors(v1, v2, min, max);
 
-	int numBlocks = totalThreads/blockSize;
+	struct timespec start, end;
+    double time_spent;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+	vector_add(v1, v2);
 
-	// validate command line arguments
-	if (totalThreads % blockSize != 0) {
-		++numBlocks;
-		totalThreads = numBlocks*blockSize;
-		
-		printf("Warning: Total thread count is not evenly divisible by the block size\n");
-		printf("The total number of threads will be rounded up to %d\n", totalThreads);
-	}
+	clock_gettime(CLOCK_MONOTONIC, &end);
+    time_spent = (end.tv_sec - start.tv_sec) + 
+                 (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("Function took %f seconds to execute\n", time_spent);
 }
