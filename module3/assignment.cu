@@ -72,10 +72,13 @@ int main(int argc, char** argv)
 	if (argc >=4) {
 		N = atoi(argv[3]);
 	}
-	printf("Total Threads: %d, Block Size: %d\n", totalThreads, blockSize);
-	printf("Computing %ld number of elements\n", N);
 
 	int numBlocks = totalThreads/blockSize;
+	printf("Total Threads: %d, Block Size: %d, Num Blocks: %d\n", totalThreads, blockSize, numBlocks);
+	printf("Computing %ld number of elements\n", N);
+
+	// Seed the random number generator
+	srand(time(NULL));
 
 	// validate command line arguments
 	if (totalThreads % blockSize != 0) {
