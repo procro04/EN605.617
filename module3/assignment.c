@@ -14,12 +14,15 @@ void init_vectors(int* v1, int* v2, int min, int max)
     }
 }
 
-void vector_add(int* v1, int* v2)
+void vector_calc(int* v1, int* v2, int* v3)
 {	
-	int v3[N];
+	int branch = N/2;
 	for (int i = 0; i < N; ++i)
 	{
-		v3[i] = v1[i] + v2[i];
+		if (i < branch)
+			v3[i] = v1[i] + v2[i];
+		else
+			v3[i] = v1[i] - v2[i];
 	}
 }
 
@@ -43,12 +46,13 @@ int main(int argc, char** argv)
 	printf("Allocated v2\n");
 	init_vectors(v1, v2, min, max);
 	printf("Initialized both vectors\n");
+	int* v3 = calloc(N , sizeof(int));
 
 	struct timespec start, end;
     double time_spent;
     clock_gettime(CLOCK_MONOTONIC, &start);
 	printf("Adding vectors\n");
-	vector_add(v1, v2);
+	vector_calc(v1, v2, v3);
 	printf("Vectors added\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &end);
