@@ -43,7 +43,7 @@ void vector_calc_stride(int* v1, int* v2, int* v3, int N)
 	const unsigned int stride = blockDim.x * gridDim.x;
 	for (int i = idx; i < N; i+=stride)
 	{
-		v3[idx] = v1[idx] + v2[idx];
+		v3[i] = v1[i] + v2[i];
 	}
 }
 __global__
@@ -112,9 +112,18 @@ int main(int argc, char** argv)
 	cudaMemcpy(gpu_v2, v2, array_size_in_bytes, cudaMemcpyHostToDevice);
 
 	// Kernel
-	vector_calc<<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N);
-
+	// vector_calc<<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N);
+	struct timespec start, end;
+    double time_spent;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+	printf("Adding vectors\n");
+	vector_calc_stride<<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N);
 	cudaDeviceSynchronize();
+	clock_gettime(CLOCK_MONOTONIC, &end);
+    time_spent = (end.tv_sec - start.tv_sec) + 
+	(end.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("Function took %f seconds to execute\n", time_spent);
+	printf("Vectors added\n");
 
 	// Done with GPU arrays
 	cudaMemcpy(v3, gpu_v3, array_size_in_bytes, cudaMemcpyDeviceToHost);
