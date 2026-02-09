@@ -21,37 +21,47 @@ void init_vectors_basic(int* v1, int* v2)
 	}
 }
 
-// __global__
-// void vector_calc(
-// 	unsigned int* block,
-// 	int* v1, int* v2, int* v3, int N)
-// {
-// 	const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-// 	int branch = N/2;
-// 	for (int i = 0; i < N; ++i)
-// 	{
-// 		if (i < branch)
-// 			v3[i] = v1[i] + v2[i];
-// 		else
-// 			v3[i] = v1[i] - v2[i];
-// 	}
-// }
 __global__
-void vector_calc_stride(int* v1, int* v2, int* v3, int N)
+void vector_calc_branch_grid_stride_demo(
+    int* v1, int* v2, int* v3, int N, int pattern)
 {
-	const unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	const unsigned int stride = blockDim.x * gridDim.x;
-	for (int i = idx; i < N; i+=stride)
-	{
-		v3[i] = v1[i] + v2[i];
-	}
-}
-__global__
-void vector_calc(int* v1, int* v2, int* v3, int N)
-{
-	const unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (idx < N)
-		v3[idx] = v1[idx] + v2[idx];
+    const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const unsigned int grid_stride = blockDim.x * gridDim.x;
+    
+    for (int i = thread_idx; i < N; i += grid_stride)
+    {
+        bool condition;
+        
+        switch(pattern) {
+            case 0:
+				// printf("Case 0: no divergence");
+                condition = true;
+                break;
+            case 1:
+				// printf("Case 1: Max divergence - alternating elements");
+                condition = (i % 2 == 0);
+                break;
+            case 3:
+				// printf("Case 3: Half array split");
+                condition = (i < N / 2);
+                break;
+        }
+        
+		int result;
+        if (condition) {
+			result = v1[i];
+			for (int j = 0; j < 100; j++) {
+				result = result * 3 + v2[i];
+			}
+		}
+        else {
+			result = v2[i];
+			for (int j = 0; j < 100; j++) {
+				result = result * 3 + v1[i];
+			}
+		}
+		v3[i] = result;
+    }
 }
 
 int main(int argc, char** argv)
@@ -62,6 +72,7 @@ int main(int argc, char** argv)
 	N = 10000;
 	int min = -1000;
 	int max = 1000;
+	int pattern = 0;
 
 	if (argc >= 2) {
 		totalThreads = atoi(argv[1]);
@@ -71,6 +82,9 @@ int main(int argc, char** argv)
 	}
 	if (argc >=4) {
 		N = atoi(argv[3]);
+	}
+	if (argc >= 5) {
+		pattern = atoi(argv[4]);
 	}
 
 	int numBlocks = totalThreads/blockSize;
@@ -117,8 +131,11 @@ int main(int argc, char** argv)
     double time_spent;
     clock_gettime(CLOCK_MONOTONIC, &start);
 	printf("Adding vectors\n");
-	vector_calc_stride<<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N);
+
+	// Execute the kernel
+	vector_calc_branch_grid_stride_demo<<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N, pattern);
 	cudaDeviceSynchronize();
+
 	clock_gettime(CLOCK_MONOTONIC, &end);
     time_spent = (end.tv_sec - start.tv_sec) + 
 	(end.tv_nsec - start.tv_nsec) / 1000000000.0;

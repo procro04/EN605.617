@@ -14,15 +14,38 @@ void init_vectors(int* v1, int* v2, int min, int max)
     }
 }
 
-void vector_calc(int* v1, int* v2, int* v3)
+void vector_calc(int* v1, int* v2, int* v3, int pattern)
 {	
-	int branch = N/2;
+	int condition;
+        
 	for (int i = 0; i < N; ++i)
 	{
-		if (i < branch)
-			v3[i] = v1[i] + v2[i];
-		else
-			v3[i] = v1[i] - v2[i];
+		switch(pattern) {
+			case 0: // Predictable - all true
+				condition = 1;
+				break;
+			case 1: // Unpredictable - based on data
+				condition = (v1[i] % 2 == 0);
+				break;
+			case 2: // Predictable alternating
+				condition = (i % 2 == 0);
+				break;
+		}
+		
+		int result;
+		// Equal work in both branches
+		if (condition) {
+			result = v1[i];
+			for (int j = 0; j < 100; j++) {
+				result = result * 3 + v2[i];
+			}
+		} else {
+			result = v2[i];
+			for (int j = 0; j < 100; j++) {
+				result = result * 3 + v1[i];
+			}
+		}
+		v3[i] = result;
 	}
 }
 
@@ -30,9 +53,13 @@ int main(int argc, char** argv)
 {
 	int min = -1000;
 	int max = 1000;
-	if (argc != 2)
+	int pattern = 0;
+	if (argc <= 2)
 	{
 		printf("Must specify the number of elements to compute.\n");
+	}
+	if (argc == 3) {
+		pattern = strtol(argv[2], NULL, 10);
 	}
 	N = strtol(argv[1], NULL, 10);
 
@@ -52,7 +79,7 @@ int main(int argc, char** argv)
     double time_spent;
     clock_gettime(CLOCK_MONOTONIC, &start);
 	printf("Adding vectors\n");
-	vector_calc(v1, v2, v3);
+	vector_calc(v1, v2, v3, pattern);
 	printf("Vectors added\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &end);
