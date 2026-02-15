@@ -13,7 +13,9 @@
 
 static const int WORK_SIZE = 256;
 
-#define NUM_ELEMENTS 4096
+//#define NUM_ELEMENTS 4096
+#define NUM_ELEMENTS 512
+//#define NUM_ELEMENTS 8192
 
 typedef struct {
 	unsigned int a;
@@ -113,7 +115,8 @@ __global__ void add_kernel_non_interleaved(
 		NON_INTERLEAVED_T * const src_ptr, const unsigned int iter,
 		const unsigned int num_elements) {
 
-	for (unsigned int tid = 0; tid < num_elements; tid++) {
+	unsigned int tid = (blockIdx.x*blockDim.x) + threadIdx.x;
+	if (tid < num_elements) {
 		for (unsigned int i = 0; i < iter; i++) {
 			dest_ptr->a[tid] += src_ptr->a[tid];
 			dest_ptr->b[tid] += src_ptr->b[tid];
