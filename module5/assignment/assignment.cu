@@ -58,8 +58,49 @@ void vector_calc_branch_grid_stride_demo(
     }
 }
 
+void host_memory_test(int numBlocks, int blockSize, int N, int pattern)
+{
+    std::cout << "========== HOST MEMORY DEMO ==========\n";
+    long array_size = N;
+    long array_size_in_bytes = sizeof(int) * array_size;
+
+    // Init vectors
+    int *h_v1, *h_v2, *h_v3;
+    cudaHostAlloc((void **)&h_v1, array_size_in_bytes, cudaHostAllocPortable);
+    cudaHostAlloc((void **)&h_v2, array_size_in_bytes, cudaHostAllocPortable);
+    cudaHostAlloc((void **)&h_v3, array_size_in_bytes, cudaHostAllocPortable);
+    init_vectors(h_v1, h_v2);
+
+    int *d_v1, *d_v2, *d_v3;
+    cudaHostGetDevicePointer((void**)&d_v1, (void*)h_v1, 0);
+    cudaHostGetDevicePointer((void**)&d_v2, (void*)h_v2, 0);
+    cudaHostGetDevicePointer((void**)&d_v3, (void*)h_v3, 0);
+
+    CodeTimer timer;
+    timer.startTiming();
+
+    // Execute the kernel
+    vector_calc_branch_grid_stride_demo
+        <<<numBlocks, blockSize>>>(d_v1, d_v2, d_v3, N, pattern);
+    cudaDeviceSynchronize();
+
+    timer.stopTiming();
+    std::cout << "HOST computation took: " 
+              << timer.elapsedSeconds() << " seconds\n";
+
+    std::cout << "Sample Results (last 5)\n";
+    for (unsigned int i = array_size-5; i < array_size; ++i) {
+        std::cout << "Index " << i << ": " << h_v3[i] << "\n";
+    }
+    // Done with host arrays
+    cudaFreeHost(h_v1);
+    cudaFreeHost(h_v2);
+    cudaFreeHost(h_v3);
+}
+
 void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
 {
+    std::cout << "========== GLOBAL MEMORY DEMO ==========\n";
     long array_size = N;
     long array_size_in_bytes = sizeof(int) * array_size;
     int *gpu_v1, *gpu_v2, *gpu_v3;
@@ -76,8 +117,6 @@ void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
     cudaMemcpy(gpu_v1, v1, array_size_in_bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(gpu_v2, v2, array_size_in_bytes, cudaMemcpyHostToDevice);
 
-    // Kernel
-    std::cout << "Adding vectors\n";
     CodeTimer timer;
     timer.startTiming();
 
@@ -87,8 +126,8 @@ void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
     cudaDeviceSynchronize();
 
     timer.stopTiming();
-    timer.timingResults();
-    std::cout << "Vectors added\n";
+    std::cout << "GLOBAL computation took: " 
+              << timer.elapsedSeconds() << " seconds\n";
 
     // Done with GPU arrays
     cudaMemcpy(v3, gpu_v3, array_size_in_bytes, cudaMemcpyDeviceToHost);
@@ -96,8 +135,9 @@ void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
     cudaFree(gpu_v2);
     cudaFree(gpu_v3);
 
+    std::cout << "Sample Results (last 5)\n";
     for (unsigned int i = array_size-5; i < array_size; ++i) {
-        std::cout << "Vec3 idx " << i << ":" << v3[i] << "\n";
+        std::cout << "Index " << i << ": " << v3[i] << "\n";
     }
     // Done with host arrays
     free(v1);
@@ -122,8 +162,9 @@ int main(int argc, char** argv)
     std::cout << "Total Threads: " << totalThreads << "\n"
               << "Block Size: " << blockSize << "\n"
               << "Num Blocks: " << numBlocks << "\n";
-    std::cout << "Computing " << N << " number of elements\n";
+    std::cout << "Computing " << N << " elements\n\n";
 
+    host_memory_test(numBlocks, blockSize, N, pattern);
     global_memory_test(numBlocks, blockSize, N, pattern);
 
     // validate command line arguments
