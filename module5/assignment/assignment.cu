@@ -4,7 +4,7 @@
 #include <vector>
 #include "CodeTimer.h"
 
-#define CONST_SIZE 64
+#define CONST_SIZE 1000
 __constant__ int const_v1[CONST_SIZE];
 __constant__ int const_v2[CONST_SIZE];
 __constant__ int const_v3[CONST_SIZE];
@@ -179,11 +179,13 @@ void constant_memory_test(int numBlocks, int blockSize, int pattern)
     init_vectors(v1, v2);
     cudaMemcpyToSymbol(const_v1, v1, CONST_SIZE * sizeof(int));
     cudaMemcpyToSymbol(const_v2, v2, CONST_SIZE * sizeof(int));
+    // std::cout << "Initialized all const memory";
 
     // Init dynamic mem so we can write the result
     std::vector<int> v3(array_size_in_bytes);
     cudaMalloc((void **)&gpu_v3, array_size_in_bytes);
-    cudaMemcpy(gpu_v3, v3.data(), CONST_SIZE, cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_v3, v3.data(), array_size_in_bytes, cudaMemcpyHostToDevice);
+    // std::cout << "Initialized all dynamic memory";
 
     CodeTimer timer;
     timer.startTiming();
@@ -198,6 +200,7 @@ void constant_memory_test(int numBlocks, int blockSize, int pattern)
               << timer.elapsedSeconds() << " seconds\n";
 
     // Done with GPU array
+    cudaMemcpy(v3.data(), gpu_v3, array_size_in_bytes, cudaMemcpyDeviceToHost);
     cudaFree(gpu_v3);
 
     std::cout << "Sample Results (last 5)\n";
@@ -211,7 +214,7 @@ int main(int argc, char** argv)
     // read command line arguments
     int totalThreads = (1 << 20);
     int blockSize = 256;
-    N = 10000;
+    N = 1000;
     int pattern = 0;
 
     if (argc >= 2) totalThreads = atoi(argv[1]);
