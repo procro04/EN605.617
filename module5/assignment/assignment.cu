@@ -1,7 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <vector>
 #include "CodeTimer.h"
+
+#define CONST_SIZE 64
+__constant__ int const_v1[CONST_SIZE];
+__constant__ int const_v2[CONST_SIZE];
+__constant__ int const_v3[CONST_SIZE];
 
 long N; // Number of elements
 
@@ -16,7 +22,7 @@ void init_vectors(int* v1, int* v2)
 }
 
 __global__
-void vector_calc_branch_grid_stride_demo(
+void vector_calc(
     int* v1, int* v2, int* v3, int N, int pattern)
 {
     const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -25,34 +31,50 @@ void vector_calc_branch_grid_stride_demo(
     for (int i = thread_idx; i < N; i += grid_stride)
     {
         bool condition;
-        
         switch(pattern) {
-            case 0:
-                // printf("Case 0: no divergence");
-                condition = true;
-                break;
-            case 1:
-                // printf("Case 1: Max divergence - alternating elements");
-                condition = (i % 2 == 0);
-                break;
-            case 3:
-                // printf("Case 3: Half array split");
-                condition = (i < N / 2);
-                break;
+            case 0: condition = true; break;
+            case 1: condition = (i % 2 == 0); break;
+            case 2: condition = (i < N / 2); break;
+            default: condition = true; break;
         }
-        
+
         int result;
         if (condition) {
             result = v1[i];
-            for (int j = 0; j < 100; j++) {
-                result = result * 3 + v2[i];
-            }
-        }
-        else {
+            for (int j = 0; j < 100; j++) result = result * 3 + v2[i];
+        } else {
             result = v2[i];
-            for (int j = 0; j < 100; j++) {
-                result = result * 3 + v1[i];
-            }
+            for (int j = 0; j < 100; j++) result = result * 3 + v1[i];
+        }
+        v3[i] = result;
+    }
+}
+
+__global__
+void vector_calc_const_mem(
+    int* v3, int pattern)
+{
+    int N = CONST_SIZE;
+    const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const unsigned int grid_stride = blockDim.x * gridDim.x;
+    
+    for (int i = thread_idx; i < N; i += grid_stride)
+    {
+        bool condition;
+        switch(pattern) {
+            case 0: condition = true; break;
+            case 1: condition = (i % 2 == 0); break;
+            case 2: condition = (i < N / 2); break;
+            default: condition = true; break;
+        }
+
+        int result;
+        if (condition) {
+            result = const_v1[i];
+            for (int j = 0; j < 100; j++) result = result * 3 + const_v2[i];
+        } else {
+            result = const_v2[i];
+            for (int j = 0; j < 100; j++) result = result * 3 + const_v1[i];
         }
         v3[i] = result;
     }
@@ -80,7 +102,7 @@ void host_memory_test(int numBlocks, int blockSize, int N, int pattern)
     timer.startTiming();
 
     // Execute the kernel
-    vector_calc_branch_grid_stride_demo
+    vector_calc
         <<<numBlocks, blockSize>>>(d_v1, d_v2, d_v3, N, pattern);
     cudaDeviceSynchronize();
 
@@ -121,7 +143,7 @@ void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
     timer.startTiming();
 
     // Execute the kernel
-    vector_calc_branch_grid_stride_demo
+    vector_calc
         <<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N, pattern);
     cudaDeviceSynchronize();
 
@@ -145,6 +167,45 @@ void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
     free(v3);
 }
 
+void constant_memory_test(int numBlocks, int blockSize, int pattern)
+{
+    std::cout << "========== CONSTANT MEMORY DEMO ==========\n";
+    int *gpu_v3;
+    int array_size = CONST_SIZE;
+    int array_size_in_bytes = CONST_SIZE * sizeof(int);
+
+    // Init const vectors
+    int v1[CONST_SIZE], v2[CONST_SIZE];
+    init_vectors(v1, v2);
+    cudaMemcpyToSymbol(const_v1, v1, CONST_SIZE * sizeof(int));
+    cudaMemcpyToSymbol(const_v2, v2, CONST_SIZE * sizeof(int));
+
+    // Init dynamic mem so we can write the result
+    std::vector<int> v3(array_size_in_bytes);
+    cudaMalloc((void **)&gpu_v3, array_size_in_bytes);
+    cudaMemcpy(gpu_v3, v3.data(), CONST_SIZE, cudaMemcpyHostToDevice);
+
+    CodeTimer timer;
+    timer.startTiming();
+
+    // Execute the kernel
+    vector_calc_const_mem
+        <<<numBlocks, blockSize>>>(gpu_v3, pattern);
+    cudaDeviceSynchronize();
+
+    timer.stopTiming();
+    std::cout << "CONSTANT computation took: " 
+              << timer.elapsedSeconds() << " seconds\n";
+
+    // Done with GPU array
+    cudaFree(gpu_v3);
+
+    std::cout << "Sample Results (last 5)\n";
+    for (unsigned int i = array_size-5; i < array_size; ++i) {
+        std::cout << "Index " << i << ": " << v3[i] << "\n";
+    }
+}
+
 int main(int argc, char** argv)
 {
     // read command line arguments
@@ -166,6 +227,7 @@ int main(int argc, char** argv)
 
     host_memory_test(numBlocks, blockSize, N, pattern);
     global_memory_test(numBlocks, blockSize, N, pattern);
+    constant_memory_test(numBlocks, blockSize, pattern);
 
     // validate command line arguments
     if (totalThreads % blockSize != 0) {
