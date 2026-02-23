@@ -25,6 +25,8 @@ target_include_directories(assignment PRIVATE ${CMAKE_SOURCE_DIR})
 # Optional: set CUDA architecture (adjust as needed, e.g. 75, 86, 89)
 # Set CUDA architecture — override at configure time if needed:
 #   cmake .. -DCMAKE_CUDA_ARCHITECTURES=89
+# Find your architecture with: 
+#   nvidia-smi --query-gpu=compute_cap --format=csv
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 86)
 endif()
@@ -34,6 +36,7 @@ set_target_properties(assignment PROPERTIES
 )
 
 # Optimization flags
-target_compile_options(assignment PRIVATE
-    $<$<COMPILE_LANGUAGE:CUDA>:-O2>
-)
+# target_compile_options(assignment PRIVATE
+#     # $<$<COMPILE_LANGUAGE:CUDA>:-O2>
+#     $<$<COMPILE_LANGUAGE:CUDA>:-G>
+# )
