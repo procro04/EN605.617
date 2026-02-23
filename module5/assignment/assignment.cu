@@ -50,7 +50,47 @@ void vector_calc(
 }
 
 __global__
-void vector_calc_const_mem(
+void vector_calc_shared(
+    int* v1, int* v2, int* v3, int N, int pattern)
+{
+    extern __shared__ int shared[];
+    int* sv1 = shared;                  // first half of shared buffer
+    int* sv2 = shared + blockDim.x;     // second half of shared buffer
+
+    const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const unsigned int grid_stride = blockDim.x * gridDim.x;
+
+    for (int i = thread_idx; i < N; i += grid_stride)
+    {
+        // Cooperatively load a tile of v1 and v2 into shared memory
+        sv1[threadIdx.x] = v1[i];
+        sv2[threadIdx.x] = v2[i];
+        __syncthreads(); // ensure all threads have loaded before any thread reads
+
+        bool condition;
+        switch(pattern) {
+            case 0: condition = true; break;
+            case 1: condition = (i % 2 == 0); break;
+            case 2: condition = (i < N / 2); break;
+            default: condition = true; break;
+        }
+
+        int result;
+        if (condition) {
+            result = sv1[threadIdx.x];
+            for (int j = 0; j < 100; j++) result = result * 3 + sv2[threadIdx.x];
+        } else {
+            result = sv2[threadIdx.x];
+            for (int j = 0; j < 100; j++) result = result * 3 + sv1[threadIdx.x];
+        }
+        v3[i] = result;
+
+        __syncthreads(); // barrier before next iteration overwrites shared memory
+    }
+}
+
+__global__
+void vector_calc_const(
     int* v3, int pattern)
 {
     int N = CONST_SIZE;
@@ -80,7 +120,7 @@ void vector_calc_const_mem(
 }
 
 __global__
-void vector_calc_register_mem(
+void vector_calc_register(
     int* v1, int* v2, int* v3, int N, int pattern)
 {
     const unsigned int thread_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -197,6 +237,53 @@ void global_memory_test(int numBlocks, int blockSize, int N, int pattern)
     free(v3);
 }
 
+void shared_memory_test(int numBlocks, int blockSize, int N, int pattern)
+{
+    std::cout << "========== SHARED MEMORY DEMO ==========\n";
+    long array_size = N;
+    long array_size_in_bytes = sizeof(int) * array_size;
+    int *gpu_v1, *gpu_v2, *gpu_v3;
+
+    // Init vectors
+    int* v1 = (int*)calloc(array_size , sizeof(int));
+    int* v2 = (int*)calloc(array_size , sizeof(int));
+    int* v3 = (int*)calloc(N , sizeof(int));
+    init_vectors(v1, v2);
+
+    cudaMalloc((void **)&gpu_v1, array_size_in_bytes);
+    cudaMalloc((void **)&gpu_v2, array_size_in_bytes);
+    cudaMalloc((void **)&gpu_v3, array_size_in_bytes);
+    cudaMemcpy(gpu_v1, v1, array_size_in_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(gpu_v2, v2, array_size_in_bytes, cudaMemcpyHostToDevice);
+
+    CodeTimer timer;
+    timer.startTiming();
+
+    // Execute the kernel
+    vector_calc_shared
+        <<<numBlocks, blockSize, N*sizeof(int)>>>(gpu_v1, gpu_v2, gpu_v3, N, pattern);
+    cudaDeviceSynchronize();
+
+    timer.stopTiming();
+    std::cout << "SHARED computation took: " 
+              << timer.elapsedSeconds() << " seconds\n";
+
+    // Done with GPU arrays
+    cudaMemcpy(v3, gpu_v3, array_size_in_bytes, cudaMemcpyDeviceToHost);
+    cudaFree(gpu_v1);
+    cudaFree(gpu_v2);
+    cudaFree(gpu_v3);
+
+    std::cout << "Sample Results (last 5)\n";
+    for (unsigned int i = array_size-5; i < array_size; ++i) {
+        std::cout << "Index " << i << ": " << v3[i] << "\n";
+    }
+    // Done with host arrays
+    free(v1);
+    free(v2);
+    free(v3);
+}
+
 void constant_memory_test(int numBlocks, int blockSize, int pattern)
 {
     std::cout << "========== CONSTANT MEMORY DEMO ==========\n";
@@ -221,7 +308,7 @@ void constant_memory_test(int numBlocks, int blockSize, int pattern)
     timer.startTiming();
 
     // Execute the kernel
-    vector_calc_const_mem
+    vector_calc_const
         <<<numBlocks, blockSize>>>(gpu_v3, pattern);
     cudaDeviceSynchronize();
 
@@ -262,7 +349,7 @@ void register_memory_test(int numBlocks, int blockSize, int N, int pattern)
     timer.startTiming();
 
     // Execute the kernel
-    vector_calc_register_mem
+    vector_calc_register
         <<<numBlocks, blockSize>>>(gpu_v1, gpu_v2, gpu_v3, N, pattern);
     cudaDeviceSynchronize();
 
@@ -293,6 +380,7 @@ int main(int argc, char** argv)
     int blockSize = 256;
     N = 8000;
     int pattern = 0;
+    std::string mode = "all";
 
     // Seed the random number generator
     srand(time(NULL));
@@ -301,6 +389,7 @@ int main(int argc, char** argv)
     if (argc >= 3) blockSize = atoi(argv[2]);
     if (argc >= 4) N = atoi(argv[3]);
     if (argc >= 5) pattern = atoi(argv[4]);
+    if (argc >= 6) mode = argv[5];
 
     int numBlocks = totalThreads/blockSize;
     std::cout << "Total Threads: " << totalThreads << "\n"
@@ -308,10 +397,18 @@ int main(int argc, char** argv)
               << "Num Blocks: " << numBlocks << "\n";
     std::cout << "Computing " << N << " elements\n\n";
 
-    host_memory_test(numBlocks, blockSize, N, pattern);
-    global_memory_test(numBlocks, blockSize, N, pattern);
-    constant_memory_test(numBlocks, blockSize, pattern);
-    register_memory_test(numBlocks, blockSize, N, pattern);
+    int run_all      = (mode == "all");
+    int run_host     = run_all || (mode == "host");
+    int run_global   = run_all || (mode == "global");
+    int run_shared   = run_all || (mode == "shared");
+    int run_constant = run_all || (mode == "constant");
+    int run_register = run_all || (mode == "register");
+
+    if (run_host)     host_memory_test(numBlocks, blockSize, N, pattern);
+    if (run_global)   global_memory_test(numBlocks, blockSize, N, pattern);
+    if (run_shared)   shared_memory_test(numBlocks, blockSize, N, pattern);
+    if (run_constant) constant_memory_test(numBlocks, blockSize, pattern);
+    if (run_register) register_memory_test(numBlocks, blockSize, N, pattern);
 
     // validate command line arguments
     if (totalThreads % blockSize != 0) {
