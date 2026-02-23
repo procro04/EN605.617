@@ -36,7 +36,7 @@ set_target_properties(assignment PROPERTIES
 )
 
 # Optimization flags
-# target_compile_options(assignment PRIVATE
-#     # $<$<COMPILE_LANGUAGE:CUDA>:-O2>
-#     $<$<COMPILE_LANGUAGE:CUDA>:-G>
-# )
+target_compile_options(assignment PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-O2>
+    # $<$<COMPILE_LANGUAGE:CUDA>:-G>
+)

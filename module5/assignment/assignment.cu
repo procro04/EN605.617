@@ -19,6 +19,15 @@ void init_vectors(int* v1, int* v2)
         v2[i] = min + rand() % (max - min + 1);
     }
 }
+void init_vectors_const(int* v1, int* v2)
+{
+    int min = -1000;
+    int max = 1000;
+    for (int i = 0; i < CONST_SIZE; i++) {
+        v1[i] = min + rand() % (max - min + 1);
+        v2[i] = min + rand() % (max - min + 1);
+    }
+}
 
 __global__
 void vector_calc(
@@ -293,7 +302,7 @@ void constant_memory_test(int numBlocks, int blockSize, int pattern)
 
     // Init const vectors
     int v1[CONST_SIZE], v2[CONST_SIZE];
-    init_vectors(v1, v2);
+    init_vectors_const(v1, v2);
     cudaMemcpyToSymbol(const_v1, v1, CONST_SIZE * sizeof(int));
     cudaMemcpyToSymbol(const_v2, v2, CONST_SIZE * sizeof(int));
     // std::cout << "Initialized all const memory";
@@ -376,7 +385,7 @@ void register_memory_test(int numBlocks, int blockSize, int N, int pattern)
 int main(int argc, char** argv)
 {
     // read command line arguments
-    int totalThreads = (1 << 20);
+    int totalThreads = 1024;
     int blockSize = 256;
     N = 8000;
     int pattern = 0;
