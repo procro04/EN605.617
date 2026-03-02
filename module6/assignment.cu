@@ -131,7 +131,9 @@ int main(int argc, char** argv)
     int numBlocks = totalThreads/blockSize;
     std::cout << "Total Threads: " << totalThreads << "\n"
               << "Block Size: " << blockSize << "\n"
-              << "Num Blocks: " << numBlocks << "\n";
+              << "Num Blocks: " << numBlocks << "\n"
+              << "Pattern: " << pattern << "\n"
+              << "Num Streams: " << nStreams << "\n";
     std::cout << "Computing " << N << " elements\n\n";
 
     // validate command line arguments
