@@ -4,7 +4,8 @@
 #include <time.h> 
 #include <cuda.h> 
 
-#define sizeOfArray 1024*1024
+// #define sizeOfArray 1024*1024
+#define sizeOfArray 2048*1024
  
 __global__ void arrayAddition(int *device_a, int *device_b, int *device_result)
 {
@@ -60,7 +61,9 @@ int main ( int argc, char **argv )
 
   /*Kernel call*/ 
 
-  arrayAddition <<<sizeOfArray, 1, 1, stream>>>(device_a, device_b, device_result);
+  // arrayAddition <<<sizeOfArray, 1, 1, stream>>>(device_a, device_b, device_result);
+  arrayAddition <<<sizeOfArray, 1024, 64, stream>>>(device_a, device_b, device_result);
+  // arrayAddition <<<sizeOfArray, 2048, 512, stream>>>(device_a, device_b, device_result);
 
   cudaMemcpyAsync(host_result, device_result, sizeOfArray * sizeof ( int ), cudaMemcpyDeviceToHost, stream);
 
