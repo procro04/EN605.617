@@ -260,7 +260,8 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-thrust_example.o:thrust_example.cpp
+# thrust_example.o:thrust_example.cpp
+thrust_example.o:thrust_example.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 thrust_example: thrust_example.o
